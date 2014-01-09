@@ -5,7 +5,7 @@
  * Provides an example payment method for Drupal Commerce for testing and
  *   development.
  */
-module_load_include('php', 'commerce_nganluong', 'nganluong_test');
+module_load_include('php', 'commerce_nganluong', 'includes/nganluong');
 
 /**
  * Implements hook_menu().
@@ -37,13 +37,14 @@ function commerce_nganluong_menu() {
  * @param type $form_state
  * @return string
  */
-function commerce_nganluong_payment_fail($form, $form_state){
-  $form['message']=array(
-    '#markup'=>'<h1>Payment error</h1>'
+function commerce_nganluong_payment_fail($form, $form_state) {
+  $form['message'] = array(
+    '#markup' => '<h1>Payment error</h1>'
   );
-  
+
   return $form;
 }
+
 /**
  * Verify payment
  */
@@ -130,44 +131,29 @@ function commerce_nganluong_commerce_payment_method_info() {
  */
 function commerce_nganluong_redirect_form($form, &$form_state, $order, $payment_method) {
   // Return an error if the enabling action's settings haven't been configured.
-//  if (empty($payment_method['settings']['business'])) {
-//    drupal_set_message(t('PayPal WPS is not configured for use. No PayPal e-mail address has been specified.'), 'error');
-//    return array();
-//  }
-//  $settings = array(
-//    // Return to the previous page when payment is canceled
-//    'cancel_return' => url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-//    // Return to the payment redirect page for processing successful payments
-//    'return' => url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE)),
-//    // Specify the current payment method instance ID in the notify_url
-//    'payment_method' => $payment_method['instance_id'],
-//  );
-//
-  $url = commerce_nganluong_build_checkout_url($order);
-  $form['#action'] = $url;
+  if (empty($payment_method['settings']['business'])) {
+    drupal_set_message(t('NganLuong Payment is not configured for use. No receiver e-mail address has been specified.'), 'error');
+    return array();
+  }
 
-//  foreach ($data as $name => $value) {
-//    if (!empty($value)) {
-//      $form[$name] = array('#type' => 'hidden', '#value' => $value);
-//    }
-//  }
+  $url = commerce_nganluong_build_checkout_url($order, $payment_method['settings']);
+  $form['#action'] = $url;
 
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Proceed to NganLuong'),
   );
   return $form;
-
-//  return commerce_paypal_wps_order_form($form, $form_state, $order, $payment_method['settings'] + $settings);
 }
 
 /**
  * 
  * @return type
  */
-function commerce_nganluong_build_checkout_url($order) {
+function commerce_nganluong_build_checkout_url($order, $settings) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-  $receiver = "phuonglh@peacesoft.net"; // Tài khoản email đăng ký trên sandbox
+//  $receiver = "phuonglh@peacesoft.net"; // Tài khoản email đăng ký trên sandbox
+  $receiver = $settings['business'];
   //Khai báo url trả về 
   $return_url = url('commerce_nganluong/verify_payment/commerce_nganluong', array('absolute' => TRUE));
 
@@ -180,9 +166,45 @@ function commerce_nganluong_build_checkout_url($order) {
   $transaction_info = "";
   //Khai báo đối tượng của lớp NL_Checkout
   $nl = new NL_Checkout();
+
+//  if ($settings['server'] == 'live') {
+//    $nl->nganluong_url = 'https://www.nganluong.vn/checkout.php';
+//  } else {
+//    $nl->nganluong_url = "http://beta.nganluong.vn/checkout.php";
+//  }
   //Tạo link thanh toán đến nganluong.vn
   $url = $nl->buildCheckoutUrl($return_url, $receiver, $transaction_info, $order_code, $price);
   return $url;
+}
+
+/**
+ * Returns the default settings for the PayPal WPS payment method.
+ */
+function commerce_nganluong_default_settings() {
+  $default_currency = commerce_default_currency();
+
+  return array(
+    'business' => '',
+    'server' => 'sandbox',
+  );
+}
+
+/**
+ * Payment method callback: settings form.
+ */
+function commerce_nganluong_settings_form($settings = array()) {
+  $form = array();
+  // Merge default settings into the stored settings array.
+  $settings = (array) $settings + commerce_nganluong_default_settings();
+  $form['business'] = array(
+    '#type' => 'textfield',
+    '#title' => t('NganLuong receiver e-mail address'),
+    '#description' => t('The primary e-mail address of the NganLuong account you want to use to receive payments.'),
+    '#default_value' => $settings['business'],
+    '#required' => TRUE,
+  );
+
+  return $form;
 }
 
 /**
@@ -210,4 +232,45 @@ function commerce_nganluong_submit_form_submit($payment_method, $pane_form, $pan
   $redirect_key = drupal_hash_base64(time());
   $order->data['payment_redirect_key'] = strtolower(urlencode($redirect_key));
   commerce_order_save($order);
+}
+
+/**
+ * Implements hook_form_FORM_ID_alter().
+ */
+function commerce_nganluong_form_commerce_checkout_form_alter(&$form, &$form_state) {
+  // If this checkout form contains the payment method radios...
+  if (!empty($form['commerce_payment']['payment_method']['#options'])) {
+    // Loop over its options array looking for a PayPal WPS option.
+    foreach ($form['commerce_payment']['payment_method']['#options'] as $key => &$value) {
+      list($method_id, $rule_name) = explode('|', $key);
+
+      // If we find PayPal WPS...
+      if ($method_id == 'commerce_nganluong') {
+        // Prepare the replacement radio button text with icons.
+        $icons = commerce_paypal_icons();
+        $logo=commerce_nganluong_logo();
+        $value = t('!logo', array('!logo' => $logo));
+        // Add the CSS.
+        $form['commerce_payment']['payment_method']['#attached']['css'][] = drupal_get_path('module', 'commerce_nganluong') . '/css/commerce_nganluong.css';
+
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * 
+ * @return type
+ */
+function commerce_nganluong_logo() {
+  $variables = array(
+    'path' => drupal_get_path('module', 'commerce_nganluong') . '/images/logo-nl.png',
+    'title' => 'NganLuong Payment Method',
+    'alt' => 'NganLuong Payment Method',
+    'attributes' => array(
+      'class' => array('commerce-nganluong-icon'),
+    ),
+  );
+  return theme('image', $variables);
 }
