@@ -1,13 +1,7 @@
-name = Payment Payment Nganluong
-description = Provides a payment method for NganLuong.vn
+name = Nganluong Payment
+description = Implements NganLuong payment services for use with Drupal Commerce.
 package = Commerce
 dependencies[] = commerce
 dependencies[] = commerce_payment
 core = 7.x
-
-; Information added by drupal.org packaging script on 2013-07-23
-version = "7.x-1.8"
-core = "7.x"
-project = "commerce"
-datestamp = "1374609067"
 
