@@ -2,8 +2,7 @@
 
 /**
  * @file
- * Provides an example payment method for Drupal Commerce for testing and
- *   development.
+ * Provides NganLuong payment method for Drupal Commerce
  */
 module_load_include('php', 'commerce_nganluong', 'includes/nganluong');
 
@@ -13,13 +12,15 @@ module_load_include('php', 'commerce_nganluong', 'includes/nganluong');
 function commerce_nganluong_menu() {
   $items = array();
 
-  // Define an always accessible path to receive IPNs.
+  // Define a path to verify payment from NganLuong.
   $items['commerce_nganluong/verify_payment/%commerce_payment_method'] = array(
     'page callback' => 'commerce_nganluong_verify_payment',
     'page arguments' => array(2),
     'access callback' => TRUE,
     'type' => MENU_CALLBACK,
   );
+
+  // Define a path to display error message when payment error.
   $items['commerce_nganluong/payment_fail'] = array(
     'page callback' => 'drupal_get_form',
     'page arguments' => array('commerce_nganluong_payment_fail'),
@@ -31,8 +32,8 @@ function commerce_nganluong_menu() {
 }
 
 /**
- * Form payment fail
- * 
+ * Page callback to display error message when payment fail
+ *
  * @param array $form
  * @param type $form_state
  * @return string
@@ -46,46 +47,49 @@ function commerce_nganluong_payment_fail($form, $form_state) {
 }
 
 /**
- * Verify payment
+ * Menu callback: verify payment from NganLuong
  */
 function commerce_nganluong_verify_payment($payment_method) {
-  //Lấy thông tin giao dịch
+  // Get transaction infomation
   $transaction_info = $_GET["transaction_info"];
-  //Lấy mã đơn hàng 
+  //Get order id
   $order_code = $_GET["order_code"];
+  // load order by code
   $order = commerce_order_load($order_code);
-  //Lấy tổng số tiền thanh toán tại ngân lượng 
+  // Get total price
   $price = $_GET["price"];
-  //Lấy mã giao dịch thanh toán tại ngân lượng
+  // Get remote payment transaction from NganLuong
   $payment_id = $_GET["payment_id"];
-  //Lấy loại giao dịch tại ngân lượng (1=thanh toán ngay ,2=thanh toán tạm giữ)
+  //Get payment type from NganLuong
   $payment_type = $_GET["payment_type"];
-  //Lấy thông tin chi tiết về lỗi trong quá trình giao dịch
+  //get error message from NganLuong
   $error_text = $_GET["error_text"];
-  //Lấy mã kiểm tra tính hợp lệ của đầu vào 
+  //Get secure code
   $secure_code = $_GET["secure_code"];
-
-  //Xử lí đầu vào 
 
   $nl = new NL_Checkout();
   $check = $nl->verifyPaymentUrl($transaction_info, $order_code, $price, $payment_id, $payment_type, $error_text, $secure_code);
-  // nếu thanh toán thành công.
+  // if payment is success.
   if ($check) {
-    // ghi nhận payment transaction 
+    // save payment transaction
     commerce_nganluong_save_payment_trasaction($order, $price, $payment_method, array($payment_id, $payment_type, $error_text, $secure_code));
-    // chuyển qua bước kế tiếp
+    // go to next pane
     $return_url = url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], array('absolute' => TRUE));
     drupal_goto($return_url);
-  } else {
-    // chuyển về trang thông báo lỗi
-    drupal_goto('commerce_nganluong/payment_fail');
+  } else { // payment fail
+    // go to previous pane.
+    $back_url = url('checkout/' . $order->order_id . '/payment/back/' . $order->data['payment_redirect_key'], array('absolute' => TRUE));
+    drupal_goto($back_url);
   }
 }
 
 /**
- * Lưu payment transaction
- * 
- * @param type $order
+ * Save payment transaction.
+ *
+ * @param object $order Object contain order info for payment.
+ * @param float $price Total price in this payment.
+ * @param array $payment_method Payment method info.
+ * @param array $info Other info from NganLuong after we verify payment.
  */
 function commerce_nganluong_save_payment_trasaction($order, $price, $payment_method, $info) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
@@ -126,8 +130,7 @@ function commerce_nganluong_commerce_payment_method_info() {
 }
 
 /**
- * Payment method callback: redirect form, a wrapper around the module's general
- *   use function for building a WPS form.
+ * Payment method callback: redirect form.
  */
 function commerce_nganluong_redirect_form($form, &$form_state, $order, $payment_method) {
   // Return an error if the enabling action's settings haven't been configured.
@@ -147,45 +150,36 @@ function commerce_nganluong_redirect_form($form, &$form_state, $order, $payment_
 }
 
 /**
- * 
- * @return type
+ * Build a checkout URL
+ *
+ * @return string The checkout URL for NganLuong payment.
  */
 function commerce_nganluong_build_checkout_url($order, $settings) {
   $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
-//  $receiver = "phuonglh@peacesoft.net"; // Tài khoản email đăng ký trên sandbox
   $receiver = $settings['business'];
-  //Khai báo url trả về 
+  // Get return url: Nganluong will redirect to this URL after payment complete (can be fail or success)
   $return_url = url('commerce_nganluong/verify_payment/commerce_nganluong', array('absolute' => TRUE));
-
-  //Giá của cả giỏ hàng 
+  // Get total order value
   $order_total = $order_wrapper->commerce_order_total->value();
   $price = commerce_currency_amount_to_decimal($order_total['amount'], $order_total['currency_code']);
-  //Mã giỏ hàng 
+  // Get order id (number)
   $order_code = $order->order_id;
-  //Thông tin giao dịch
-  $transaction_info = "";
-  //Khai báo đối tượng của lớp NL_Checkout
+  //Define transaction info
+  $transaction_info = ""; // @todo
+  // Define main object
   $nl = new NL_Checkout();
 
-//  if ($settings['server'] == 'live') {
-//    $nl->nganluong_url = 'https://www.nganluong.vn/checkout.php';
-//  } else {
-//    $nl->nganluong_url = "http://beta.nganluong.vn/checkout.php";
-//  }
-  //Tạo link thanh toán đến nganluong.vn
+  // Call method buildCheckoutUrl() to build checkout url to send cho nganluong.vn
   $url = $nl->buildCheckoutUrl($return_url, $receiver, $transaction_info, $order_code, $price);
   return $url;
 }
 
 /**
- * Returns the default settings for the PayPal WPS payment method.
+ * Returns the default settings for the NganLuong payment method.
  */
 function commerce_nganluong_default_settings() {
-  $default_currency = commerce_default_currency();
-
   return array(
     'business' => '',
-    'server' => 'sandbox',
   );
 }
 
@@ -212,7 +206,7 @@ function commerce_nganluong_settings_form($settings = array()) {
  */
 function commerce_nganluong_submit_form($payment_method, $pane_values, $checkout_pane, $order) {
   $form = array();
-  // @todo: Add some helpful elements 
+  // @todo: Add some helpful elements
   return $form;
 }
 
@@ -236,6 +230,8 @@ function commerce_nganluong_submit_form_submit($payment_method, $pane_form, $pan
 
 /**
  * Implements hook_form_FORM_ID_alter().
+ *
+ * Add icon for NganLuong payment method in checkout form.
  */
 function commerce_nganluong_form_commerce_checkout_form_alter(&$form, &$form_state) {
   // If this checkout form contains the payment method radios...
@@ -243,16 +239,11 @@ function commerce_nganluong_form_commerce_checkout_form_alter(&$form, &$form_sta
     // Loop over its options array looking for a PayPal WPS option.
     foreach ($form['commerce_payment']['payment_method']['#options'] as $key => &$value) {
       list($method_id, $rule_name) = explode('|', $key);
-
-      // If we find PayPal WPS...
       if ($method_id == 'commerce_nganluong') {
-        // Prepare the replacement radio button text with icons.
-        $icons = commerce_paypal_icons();
-        $logo=commerce_nganluong_logo();
+        $logo = commerce_nganluong_logo();
         $value = t('!logo', array('!logo' => $logo));
         // Add the CSS.
         $form['commerce_payment']['payment_method']['#attached']['css'][] = drupal_get_path('module', 'commerce_nganluong') . '/css/commerce_nganluong.css';
-
         break;
       }
     }
@@ -260,8 +251,7 @@ function commerce_nganluong_form_commerce_checkout_form_alter(&$form, &$form_sta
 }
 
 /**
- * 
- * @return type
+ * Get logo for NganLuong payment.
  */
 function commerce_nganluong_logo() {
   $variables = array(
@@ -273,4 +263,13 @@ function commerce_nganluong_logo() {
     ),
   );
   return theme('image', $variables);
+}
+
+/**
+ * Payment method callback: redirect_form_back
+ *
+ * Display error message if there is error with payment transaction.
+ */
+function commerce_nganluong_redirect_form_back($order, $payment_method) {
+  drupal_set_message(t('There is an error with your payment. Please try again or contact administrator.'), 'error');
 }

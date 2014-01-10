@@ -11,14 +11,14 @@ Commerce payment method for NganLuong (https://www.nganluong.vn)
 #Installation
 1. Download class NL_Checkout from https://www.nganluong.vn/data/document/NganLuong_PHP.rar
 2. Extract this file and copy file nganluong.php to  folder includes/ (the path will be <module folder>commerce_nganluong/includes/nganluong.php).
-4. Edit file nganluong.php to match your NganLuong account
+3. Edit file nganluong.php to match your NganLuong account
    - Change $nganluong_url. Use 'https://www.nganluong.vn/checkout.php' for your live account. 
      Use 'http://beta.nganluong.vn/checkout.php' for your sandbox account.
    - Change $merchant_site_code: this code is provided by Nganluong.vn
    - Change $secure_pass: this pass is provided by Nganluong.vn
    - Change other variables to match your requirement.
-3. Enable this module as usual.
-4. Go to URL admin/commerce/config/payment-methods to config for this payment method. 
+4. Enable this module as usual.
+5. Go to URL admin/commerce/config/payment-methods to config for this payment method. 
    Enter NganLuong receiver e-mail address and press Save button.
-5. Check out and select NganLuong payment method.
-6. Done!
+6. Check out and select NganLuong payment method.
+7. Done!
