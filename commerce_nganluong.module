@@ -3,6 +3,7 @@
 /**
  * @file
  * Provides NganLuong payment method for Drupal Commerce
+ * 
  */
 module_load_include('php', 'commerce_nganluong', 'includes/nganluong');
 
@@ -31,26 +32,12 @@ function commerce_nganluong_menu() {
   return $items;
 }
 
-/**
- * Page callback to display error message when payment fail
- *
- * @param array $form
- * @param type $form_state
- * @return string
- */
-function commerce_nganluong_payment_fail($form, $form_state) {
-  $form['message'] = array(
-    '#markup' => '<h1>Payment error</h1>'
-  );
-
-  return $form;
-}
 
 /**
  * Menu callback: verify payment from NganLuong
  */
 function commerce_nganluong_verify_payment($payment_method) {
-  // Get transaction infomation
+  // Get transaction information
   $transaction_info = $_GET["transaction_info"];
   //Get order id
   $order_code = $_GET["order_code"];

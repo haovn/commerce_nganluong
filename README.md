@@ -20,5 +20,5 @@ Commerce payment method for NganLuong (https://www.nganluong.vn)
 4. Enable this module as usual.
 5. Go to URL admin/commerce/config/payment-methods to config for this payment method. 
    Enter NganLuong receiver e-mail address and press Save button.
-6. Check out and select NganLuong payment method.
+6. Checkout and select NganLuong payment method.
 7. Done!
